@@ -1,8 +1,8 @@
 import { connection } from '../database.js';
 
 export async function postUrl(req, res) {
-  const { url } = req.body;
   const user = res.locals.user;
+  const { url } = req.body;
 
   try {
     if (!url) {
@@ -36,13 +36,30 @@ export async function getShortUrl(req, res) {
     }
 
     const searchedShortUrl = await connection.query(`
-      SELECT * FROM "shortenedUrls" AS s 
+      SELECT 
+        s.id, s."shortUrl", s.url 
+      FROM "shortenedUrls" AS s 
       WHERE s."shortUrl"=$1
     `, [shortUrl]);
     if(searchedShortUrl.rowCount === 0){
       res.sendStatus(404);
       return;
     }
+
+    const searchedVisitCount = await connection.query(`
+      SELECT 
+        s."visitCount"
+      FROM "shortenedUrls" AS s 
+      WHERE s."shortUrl"=$1
+    `, [shortUrl]);
+
+    searchedVisitCount.rows[0].visitCount++;
+
+    await connection.query(`
+      UPDATE "shortenedUrls"
+        SET "visitCount"=$1 
+      WHERE id=$2
+    `, [searchedVisitCount.rows[0].visitCount, searchedShortUrl.rows[0].id]);
 
     res.status(200).send(searchedShortUrl.rows[0]);
   } catch (error) {
@@ -54,7 +71,6 @@ export async function getShortUrl(req, res) {
 export async function deleteUrl(req, res) {
   const user = res.locals.user;
   const { id } = req.params;
-  console.log(id);
 
   try {
     const searchedShortUrl = await connection.query(`
@@ -77,3 +93,41 @@ export async function deleteUrl(req, res) {
     res.sendStatus(500);
   }
 };
+
+export async function getUser(req, res) {
+  const { id } = req.params;
+
+  try {
+    const searchedUser = await connection.query(`
+      SELECT 
+        u.id, u.name 
+      FROM users AS u
+      WHERE u.id=$1
+    `, [id]);
+    if(searchedUser.rowCount === 0){
+      res.sendStatus(404);
+      return;
+    }
+
+    const searchedShortUrls = await connection.query(`
+      SELECT 
+        s.id, s."shortUrl", s.url, s."visitCount"
+      FROM "shortenedUrls" AS s
+      WHERE s."userId"=$1
+    `, [searchedUser.rows[0].id]);
+
+    let sumVisitCount = 0;
+    searchedShortUrls.rows.map(shortUrl => sumVisitCount += shortUrl.visitCount);
+
+    const userShortUrls = {
+      ...searchedUser.rows[0],
+      "visitCount": sumVisitCount,
+      "shortenedUrls": [ ...searchedShortUrls.rows ]
+    }
+
+    res.status(200).send(userShortUrls);    
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500);
+  }
+}
