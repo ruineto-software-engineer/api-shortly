@@ -56,6 +56,7 @@ export async function getUserShortUrls(req, res) {
         s.id, s."shortUrl", s.url, s."visitCount"
       FROM "shortenedUrls" AS s
       WHERE s."userId"=$1
+      ORDER BY s."visitCount" DESC
     `, [searchedUser.rows[0].id]);
 
     let sumVisitCount = 0;
