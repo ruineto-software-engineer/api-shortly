@@ -93,3 +93,19 @@ export async function deleteUrl(req, res) {
     res.sendStatus(500);
   }
 };
+
+export async function getUrls(_req, res) {
+  try {
+    const urls = await connection.query(`
+      SELECT 
+        *
+      FROM "shortenedUrls" AS s
+      ORDER BY s."visitCount" DESC
+    `);
+
+    res.status(200).send(urls.rows);    
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500);
+  }
+}
