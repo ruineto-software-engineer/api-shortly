@@ -60,8 +60,8 @@ export async function getShortUrl(req, res) {
         SET "visitCount"=$1 
       WHERE id=$2
     `, [searchedVisitCount.rows[0].visitCount, searchedShortUrl.rows[0].id]);
-
-    res.status(200).send(searchedShortUrl.rows[0]);
+    
+    res.status(200).send(searchedShortUrl.rows[0].url);
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
