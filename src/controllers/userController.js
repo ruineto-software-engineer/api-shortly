@@ -1,6 +1,5 @@
-import { connection } from '../database.js';
-import bcrypt from 'bcrypt';
 import * as userRepository from "../repositories/userRepository.js";
+import bcrypt from 'bcrypt';
 
 export async function createUser(req, res) {
   const user = req.body;
