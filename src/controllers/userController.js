@@ -1,22 +1,19 @@
-import bcrypt from 'bcrypt';
 import { connection } from '../database.js';
+import bcrypt from 'bcrypt';
+import * as userRepository from "../repositories/userRepository.js";
 
 export async function createUser(req, res) {
   const user = req.body;
 
   try {
-    const existingUsers = await connection.query('SELECT * FROM users WHERE email=$1', [user.email])
+    const existingUsers = await userRepository.existingUsers(user.email);
     if (existingUsers.rowCount > 0) {
       return res.sendStatus(409);
     }
 
     const passwordHash = bcrypt.hashSync(user.password, 10);
 
-    await connection.query(`
-      INSERT INTO 
-        users(name, email, password) 
-      VALUES ($1, $2, $3)
-    `, [user.name, user.email, passwordHash])
+    await userRepository.createUser(user.name, user.email, passwordHash);
 
     res.sendStatus(201);
   } catch (error) {
@@ -40,24 +37,13 @@ export async function getUserShortUrls(req, res) {
   const { id } = req.params;
 
   try {
-    const searchedUser = await connection.query(`
-      SELECT 
-        u.id, u.name 
-      FROM users AS u
-      WHERE u.id=$1
-    `, [id]);
+    const searchedUser = await userRepository.searchedUser(id);
     if(searchedUser.rowCount === 0){
       res.sendStatus(404);
       return;
     }
 
-    const searchedShortUrls = await connection.query(`
-      SELECT 
-        s.id, s."shortUrl", s.url, s."visitCount"
-      FROM "shortenedUrls" AS s
-      WHERE s."userId"=$1
-      ORDER BY s."visitCount" DESC
-    `, [searchedUser.rows[0].id]);
+    const searchedShortUrls = await userRepository.searchedShortUrls(searchedUser.rows[0].id);
 
     let sumVisitCount = 0;
     searchedShortUrls.rows.map(shortUrl => sumVisitCount += shortUrl.visitCount);
@@ -77,17 +63,7 @@ export async function getUserShortUrls(req, res) {
 
 export async function getUsersRanking(_req, res) {
   try {
-    const usersRanking = await connection.query(`
-      SELECT 
-        u.id, u.name,
-        COUNT(s."shortUrl") AS "linksCount",
-        SUM(s."visitCount") AS "visitCount"
-      FROM users AS u
-        JOIN "shortenedUrls" AS s ON s."userId"=u.id
-      GROUP BY u.id
-      ORDER BY "visitCount" DESC
-      LIMIT 10
-    `);
+    const usersRanking = await userRepository.usersRanking();
 
     res.send(usersRanking.rows);
   } catch (error) {
